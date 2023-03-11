@@ -69,7 +69,7 @@ GROUP BY dea.continent, dea.location, dea.date, dea.population
 ORDER BY [date] desc
 
 
--- Using CTE to perform Calculation on Partition By in previous query
+-- Usando CTE para executar o cálculo na partição por na consulta anterior
 
 With PopvsVac (Continent, Location, Date, Population, New_Vaccinations, RollingPeopleVaccinated)
 as
@@ -98,3 +98,42 @@ FROM Covid19..CovidDeaths
 WHERE continent IS NOT NULL
 GROUP BY location
 ORDER BY 1
+
+-- Using Temp Table to perform Calculation on Partition By in previous query
+
+DROP Table if exists #PercentPopulationVaccinated
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
+
+Insert into #PercentPopulationVaccinated
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(bigint,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From Covid19..CovidDeaths dea
+Join Covid19..CovidVaccination vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+--where dea.continent is not null 
+--order by 2,3
+
+Select *, (RollingPeopleVaccinated/Population)*100
+From #PercentPopulationVaccinated
+
+-- Creating View to store data for later visualizations
+
+Create View PercentPopulationVaccinated as
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(int,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From Covid19..CovidDeaths dea
+Join Covid19..CovidVaccination vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null 
